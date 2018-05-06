@@ -50,15 +50,20 @@ ENV CROSS_TOOLCHAIN_PATH  /opt/linaro-arm-linux-gnueabihf
 ENV BUILDROOT_CONFIG_FILE buildroot_beaglebone_config
 
 #
+# Work folder where to build buildroot
+ENV BUILDROOT_FOLDER      buildrootsource
+
+#
 # Setup the build environment
 RUN wget -nv $BUILDROOT_DWLD_ADDR \
     && wget -nv $TOOLCHAIN_DWLD_ADDR \
     && tar xvf $BUILDROOT_FILE_NAME \
+    && mv $BUILDROOT_FILE_PREFIX $BUILDROOT_FOLDER \
     && tar xvf $TOOLCHAIN_FILE_NAME \
     && mv $TOOLCHAIN_FILE_PREFIX $CROSS_TOOLCHAIN_PATH \
     && echo "export PATH=$PATH:"$CROSS_TOOLCHAIN_PATH"/bin" >> .bashrc
 
-WORKDIR $BUILDROOT_FILE_PREFIX
+WORKDIR $BUILDROOT_FOLDER
 RUN make distclean && make beaglebone_defconfig && cp ../$BUILDROOT_CONFIG_FILE .config
 
 #

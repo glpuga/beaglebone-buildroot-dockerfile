@@ -1,0 +1,7 @@
+version: '3'
+services:
+  buildroot:
+    build: .
+    tty: true
+    volumes:
+      - /tmp/buildroot/storedstate:/root/storedstate

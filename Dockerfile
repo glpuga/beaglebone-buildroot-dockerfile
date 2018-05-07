@@ -10,19 +10,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends apt-utils
 
 #
 # Install xz-utils and gzip to untar the cross-compilations tools.
-# The enviroment variable tells ubuntu that apt-utils is present in the
+# DEBIAN_FRONTEND tells ubuntu that apt-utils is present in the
 # system. This is a quirk on the Ubuntu:16.04 official image.
 # Install build-essential to get make and other stuff
 # Install libncurses5-dev to enable make menuconfig.
 # install wget, required by buildroot
 # Install other smaller utilities required by buildroot.
-RUN DEBIAN_FRONTEND=noninteractive apt-get -y install xz-utils gzip build-essential binutils libncurses5-dev wget
-RUN DEBIAN_FRONTEND=noninteractive apt-get -y install wget cpio python bc file rsync unzip
-
-#
-# Copy all the local files to /root
-WORKDIR /root
-COPY files/. .
+RUN DEBIAN_FRONTEND=noninteractive apt-get -y install xz-utils gzip build-essential binutils libncurses5-dev wget wget cpio python bc file rsync unzip
 
 #
 # Build environment variables
@@ -47,21 +41,42 @@ ENV CROSS_TOOLCHAIN_PATH  /opt/linaro-arm-linux-gnueabihf
 
 #
 # Select the buildroot configuration file.
-ENV BUILDROOT_CONFIG_FILE buildroot_beaglebone_config
+ENV CONFIG_FILE_NAME      buildroot_beaglebone_config
+
+#
+# Work folder where to build buildroot
+ENV BUILDROOT_BUILD_PATH  /root/buildrootsource
+ENV STORED_STATE_PATH     /root/storedstate
 
 #
 # Setup the build environment
+WORKDIR /root
+
 RUN wget -nv $BUILDROOT_DWLD_ADDR \
-    && wget -nv $TOOLCHAIN_DWLD_ADDR \
+    && wget -nv $TOOLCHAIN_DWLD_ADDR
+
+RUN mkdir $STORED_STATE_PATH \
     && tar xvf $BUILDROOT_FILE_NAME \
+    && mv $BUILDROOT_FILE_PREFIX $BUILDROOT_BUILD_PATH \
+    && rm $BUILDROOT_FILE_NAME \
     && tar xvf $TOOLCHAIN_FILE_NAME \
     && mv $TOOLCHAIN_FILE_PREFIX $CROSS_TOOLCHAIN_PATH \
+    && rm $TOOLCHAIN_FILE_NAME \
     && echo "export PATH=$PATH:"$CROSS_TOOLCHAIN_PATH"/bin" >> .bashrc
 
-WORKDIR $BUILDROOT_FILE_PREFIX
-RUN make distclean && make beaglebone_defconfig && cp ../$BUILDROOT_CONFIG_FILE .config
+#
+# The following console alias is important because we are building buildroot
+# out-of-tree, and it's too easy to forget the need to add "O=<folder>" when
+# calling make.
+RUN echo "alias make=\"make O="$STORED_STATE_PATH"\"/output" >> .bashrc
+
+#
+# Copy the remaining files: the entrypoint, and the default minimal
+# configuration.
+COPY files/entrypoint.sh .
+COPY files/$CONFIG_FILE_NAME .config
 
 #
 # Entrypoint will call make, or you can call a bash shell.
-
+WORKDIR $BUILDROOT_BUILD_PATH
 ENTRYPOINT ["/root/entrypoint.sh"]

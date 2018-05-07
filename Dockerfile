@@ -20,14 +20,10 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get -y install xz-utils gzip build-essent
 RUN DEBIAN_FRONTEND=noninteractive apt-get -y install wget cpio python bc file rsync unzip
 
 #
-# Copy all the local files to /root
-WORKDIR /root
-COPY files/. .
-
-#
 # Build environment variables
 ENV ARCH           arm
 ENV CROSS_COMPILE  arm-linux-gnueabihf-
+ENV O              /root/storedstate/output
 
 #
 # Buildroot source file data
@@ -51,20 +47,34 @@ ENV BUILDROOT_CONFIG_FILE buildroot_beaglebone_config
 
 #
 # Work folder where to build buildroot
-ENV BUILDROOT_FOLDER      buildrootsource
+ENV BUILDROOT_FOLDER      /root/buildrootsource
+ENV STORED_STATE_PATH     /root/storedstate
 
 #
 # Setup the build environment
+WORKDIR /root
+
 RUN wget -nv $BUILDROOT_DWLD_ADDR \
-    && wget -nv $TOOLCHAIN_DWLD_ADDR \
+    && wget -nv $TOOLCHAIN_DWLD_ADDR
+
+RUN mkdir $STORED_STATE_PATH \
+    && mkdir $STORED_STATE_PATH/dl \
+    && mkdir $STORED_STATE_PATH/output \
     && tar xvf $BUILDROOT_FILE_NAME \
     && mv $BUILDROOT_FILE_PREFIX $BUILDROOT_FOLDER \
+    && rm $BUILDROOT_FILE_NAME \
     && tar xvf $TOOLCHAIN_FILE_NAME \
     && mv $TOOLCHAIN_FILE_PREFIX $CROSS_TOOLCHAIN_PATH \
-    && echo "export PATH=$PATH:"$CROSS_TOOLCHAIN_PATH"/bin" >> .bashrc
+    && rm $TOOLCHAIN_FILE_NAME \
+    && echo "export PATH=$PATH:"$CROSS_TOOLCHAIN_PATH"/bin" >> .bashrc \
+    && echo "alias make=\"make O="$STORED_STATE_PATH"\"/output" >> .bashrc
+
+COPY files/entrypoint.sh .
+COPY files/$BUILDROOT_CONFIG_FILE .config
 
 WORKDIR $BUILDROOT_FOLDER
-RUN make distclean && make beaglebone_defconfig && cp ../$BUILDROOT_CONFIG_FILE .config
+
+RUN make distclean
 
 #
 # Entrypoint will call make, or you can call a bash shell.
